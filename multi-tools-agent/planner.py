@@ -16,51 +16,45 @@ def extract_json(text):
     return match.group(0) if match else None
 
 
-def get_next_step(client, user_input, previous_result=None):
-    """
-    Ask LLM for NEXT step (not full plan)
-    """
-
+def get_next_step(client, user_input, history):
     system_prompt = """
-    You are a step-by-step reasoning agent.
+    You are a smart reasoning agent.
 
-    At each step, decide the NEXT action.
-
-    Return ONLY one JSON object.
+    You solve problems step-by-step using tools.
 
     Available tools:
     - add_numbers(a:int, b:int)
     - multiply_numbers(a:int, b:int)
 
     Rules:
-    - Use "$prev" if referring to previous result
-    - Think step-by-step
-    - Do NOT skip steps
-    - If problem is solved, return:
+    - You may use previous results from history
+    - Be logical and efficient
+    - If solved, return:
 
-    {"final_answer": "answer here"}
+    {"final_answer": "answer"}
 
     Otherwise return:
 
     {
-        "tool": "tool_name",
-        "args": {
-            "a": ...,
-            "b": ...
-        }
+        "tool": "...",
+        "args": {...}
     }
     """
 
-    user_message = user_input
+    messages = [
+        {"role": "user", "content": f"Problem: {user_input}"}
+    ]
 
-    # If we already have a result, pass it back
-    if previous_result is not None:
-        user_message += f"\nPrevious result: {previous_result}"
+    for step in history:
+        messages.append({
+            "role": "assistant",
+            "content": str(step)
+        })
 
     response = client.messages.create(
         model=MODEL_NAME,
         system=system_prompt,
-        messages=[{"role": "user", "content": user_message}],
+        messages=messages,
         max_tokens=150,
         temperature=0
     )

@@ -1,11 +1,10 @@
-import json
-import re
-from planner import get_next_step   # 🔥 use loop planner
+from planner import get_next_step, parse_step
 from executor import execute_step
-from anthropic import Anthropic
 import os
 from dotenv import load_dotenv
+from anthropic import Anthropic
 
+# Load environment variables
 load_dotenv()
 
 API_KEY = os.getenv("ANTHROPIC_API_KEY")
@@ -14,47 +13,35 @@ MODEL_NAME = os.getenv("MODEL_NAME")
 client = Anthropic(api_key=API_KEY)
 
 
-def extract_json(text):
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    return match.group(0) if match else None
-
-
 def run():
     user_input = input("You: ")
 
-    history = []
-    result = None
+    history = []       # 🧠 stores all steps
+    result = None      # 🔁 stores last result
 
-    for i in range(5):  # limit steps
-        print(f"\n🔁 Step {i+1}")
+    while True:
+        # 🔮 Ask LLM for next step
+        step_text = get_next_step(client, user_input, history)
+        print("\n🧠 RAW STEP:\n", step_text)
 
-        raw = get_next_step(client, user_input, history)
-        print("🧠 RAW:", raw)
+        # 🧾 Parse JSON
+        step = parse_step(step_text)
 
-        clean = extract_json(raw)
-
-        if not clean:
-            print("❌ Failed to parse")
-            break
-
-        step = json.loads(clean)
-
-        # ✅ final answer
+        # ✅ If final answer → stop
         if "final_answer" in step:
             print("\n✅ Final Answer:", step["final_answer"])
-            return
+            break
 
-        # 🔧 execute step
+        # 🔧 Execute tool
         result = execute_step(step, result)
+
         print("Result:", result)
 
-        # 🧠 store history
+        # 🧠 Save to history
         history.append({
             "step": step,
             "result": result
         })
-
-    print("\n⚠️ Max steps reached")
 
 
 if __name__ == "__main__":
